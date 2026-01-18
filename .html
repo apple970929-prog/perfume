@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氣味靈魂圖鑑</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --main-brown: #8b5e3c; --bg-paper: #f4eee8; --soft-purple: #cbb6d9; --text-dark: #4a4a4a; }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: #e0e0e0; margin: 0; display: flex; justify-content: center; color: var(--text-dark); }
+        #app { background: var(--bg-paper); width: 100%; max-width: 500px; min-height: 100vh; padding: 30px 20px; box-sizing: border-box; position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.1); }
+        
+        /* 測驗區樣式 */
+        #quiz { text-align: center; padding-top: 20px; }
+        .q-tag { font-size: 0.85rem; color: #999; letter-spacing: 3px; margin-bottom: 15px; font-weight: bold; }
+        h2 { font-size: 1.3rem; line-height: 1.7; color: var(--main-brown); min-height: 4em; margin-bottom: 30px; }
+        .options { display: flex; flex-direction: column; gap: 15px; }
+        .opt-btn { padding: 20px; border: 1px solid #fff; border-radius: 15px; background: rgba(255,255,255,0.8); cursor: pointer; text-align: left; font-size: 1rem; color: var(--text-dark); transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+        #prev-btn { position: fixed; right: 25px; bottom: 35px; width: 65px; height: 65px; background-color: #ffffff; color: var(--main-brown); border: 3px solid var(--soft-purple); border-radius: 50%; font-size: 28px; font-weight: bold; cursor: pointer; display: none; justify-content: center; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,0.15); z-index: 9999; }
+
+        /* 結果區樣式 */
+        #result { display: none; text-align: center; animation: fadeIn 1s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .type-name { font-size: 1.7rem; color: var(--soft-purple); font-weight: bold; margin: 20px 0; line-height: 1.4; border-bottom: 2px solid var(--soft-purple); display: inline-block; padding-bottom: 5px; }
+        .desc-box { text-align: left; line-height: 1.9; background: #fff; padding: 25px; border-radius: 20px; color: #555; font-size: 1.1rem; margin-top: 10px; }
+        
+        /* 推薦產品區 */
+        .recomm-box { margin-top: 25px; background: #fff; padding: 20px; border-radius: 20px; text-align: left; border: 2px dashed var(--soft-purple); }
+        .recomm-title { font-weight: bold; color: var(--main-brown); margin-bottom: 8px; font-size: 1rem; }
+        .product-link { display: block; text-align: center; background: var(--soft-purple); color: white; padding: 15px; border-radius: 30px; text-decoration: none; font-weight: bold; margin-top: 15px; font-size: 1rem; }
+
+        .chart-wrap { background: #fff; border-radius: 20px; padding: 20px; height: 320px; margin-top: 25px; }
+        .restart-btn { width: 100%; padding: 18px; border-radius: 15px; border: none; background: #bbb; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="quiz">
+        <div id="progress" class="q-tag">鑑定進度 1 / 10</div>
+        <h2 id="q-text">靈魂氣味掃描中...</h2>
+        <div class="options" id="opt-container"></div>
+    </div>
+
+    <button id="prev-btn" onclick="handlePrev()">←</button>
+
+    <div id="result">
+        <p style="color:var(--main-brown); font-weight:bold; margin-bottom:5px;">鑑定完畢，你的香氣靈魂是</p>
+        <div id="top-type" class="type-name"></div>
+        <div id="desc" class="desc-box"></div>
+
+        <div class="recomm-box">
+            <div class="recomm-title">✨ 小草香鋪 · 命定推薦</div>
+            <div id="recomm-text" style="font-size: 0.95rem; color: #666; line-height: 1.6;"></div>
+            <a href="https://littlegrass.asia/" target="_blank" class="product-link">前往官網尋找此香氣</a>
+        </div>
+
+        <div class="chart-wrap">
+            <canvas id="scoreChart"></canvas>
+        </div>
+        <button class="restart-btn" onclick="location.reload()">重新鑑定</button>
+    </div>
+</div>
+
+<script>
+    const questions = [
+        { q: "Q1. 週末早上醒來，你最喜歡哪種味道？", a: "a. 庭院的各種花香", b: "b. 廚房新鮮水果", c: "c. 森林裡樹木與泥土", d: "d. 雨後清新空氣", e: "e. 剛出爐的甜點" },
+        { q: "Q2. 走進陌生咖啡廳，你第一眼會注意？", a: "a. 花藝擺設", b: "b. 彩色甜點", c: "c. 木頭家具", d: "d. 明亮大窗", e: "e. 空氣中的咖啡香" },
+        { q: "Q3. 壓力大時，哪個畫面最療癒你？", a: "a. 在花園散步", b: "b. 花園裡採水果", c: "c. 小木屋中讀書", d: "d. 無人海邊吹風", e: "e. 沙發＋甜點" },
+        { q: "Q4. 你理想的房間風格是？", a: "a. 浪漫花卉", b: "b. 明亮有植物", c: "c. 原木簡約", d: "d. 北歐留白", e: "e. 溫馨柔軟" },
+        { q: "Q5. 朋友生日，你最想送什麼？", a: "a. 繽紛花束", b: "b. 水果禮盒", c: "c. 木質小物", d: "d. 簡約香氛用品", e: "e. 巧克力或蛋糕" },
+        { q: "Q6. 在一段關係中，覺得你給人的感覺是？", a: "a. 溫柔細心", b: "b. 活潑開朗", c: "c. 穩定可靠", d: "d. 自在不黏人", e: "e. 溫暖好靠近" },
+        { q: "Q7. 如果要旅行，你會選？", a: "a. 花海小鎮", b: "b. 熱帶島嶼", c: "c. 山中木屋", d: "d. 冰島或海邊", e: "e. 歐洲甜點市集" },
+        { q: "Q8. 穿搭時你最在意？", a: "a. 花紋細節", b: "b. 色彩亮不亮", c: "c. 布料質感", d: "d. 剪裁俐落", e: "e. 觸感柔軟" },
+        { q: "Q9. 工作或讀書時，你喜歡的背景聲？", a: "a. 輕柔音樂", b: "b. 節奏感音樂", c: "c. 爵士或低音樂", d: "d. 自然白噪音", e: "e. 溫暖輕快的歌" },
+        { q: "Q10. 你希望給人的整體感覺是？", a: "a. 有質感、有美感", b: "b. 有活力、好相處", c: "c. 成熟可靠", d: "d. 乾淨有個性", e: "e. 親切有安全感" }
+    ];
+
+    let current = 0;
+    let scores = { a:0, b:0, c:0, d:0, e:0 };
+    let historyStack = [];
+
+    const comboData = {
+        // 單一
+        "a": { t: "優雅花香調", d: "心思細膩且富有同理心。你如同盛開的花朵，在優雅的外表下擁有一顆浪漫柔軟的心。", r: "推薦：奧索尼爾玫瑰、龍舌蘭晚香玉，綻放妳的純粹魅力。" },
+        "b": { t: "陽光果香調", d: "充滿活力且樂觀開朗。你就像陽光下的多汁水果，清甜而亮眼，是群體中的能量來源。", r: "推薦：Jealous (似妒嫉)，明亮清澈的花果香氣最適合妳。" },
+        "c": { t: "沉穩木質調", d: "擁有成熟、溫暖、沈穩的魅力。你不隨波逐流，內心強大且沈穩，是值得信賴的智者。", r: "推薦：No.11 中性淡香精、北方雪松，展現獨一無二的深邃感。" },
+        "d": { t: "極簡水生調", d: "追求純粹與心靈的絕對自由。你的氣息如雨後空氣般乾淨，不喜歡複雜，嚮往極簡生活。", r: "推薦：The Balance (似白茶)，自然純淨的氣味讓人心情平靜。" },
+        "e": { t: "療癒甜香調", d: "感性且保有一顆純真童心。你懂得如何享受生活瞬間，給人如同甜點般的療癒感。", r: "推薦：溫柔炸彈、神秘之香，讓幸福感如影隨形。" },
+        // 兩兩
+        "ab": { t: "【嬌豔靈動】花香 × 果香", d: "「優雅中透著俏皮，你是春日花園裡最燦爛的笑意。」", r: "推薦：Jealous (似妒嫉) —— 清新挑逗的花果香氣，最能襯托妳的靈動。" },
+        "ac": { t: "【溫柔堅毅】花香 × 木質", d: "「感性而不失沉穩，在柔美花影下擁有一顆堅定之心。」", r: "推薦：檀香之道 —— 輕柔花香與絲滑檀香，展現獨立而溫暖的氣質。" },
+        "ad": { t: "【空靈詩意】花香 × 水生", d: "「細膩且追求自由，如水面落花，美得澄澈而灑脫。」", r: "推薦：奧索尼爾玫瑰 —— 玫瑰香氣與水感交織，優雅而空靈。" },
+        "ae": { t: "【浪漫療癒】花香 × 甜香", d: "「極致柔情與暖意，你是世間最細膩的一抹感性。」", r: "推薦：龍舌蘭晚香玉 —— 馥郁白花魂靈，誘惑中藏著細膩甜意。" },
+        "bc": { t: "【活力知性】果香 × 木質", d: "「赤子之心與智慧並存，活潑動人卻又無比可靠。」", r: "推薦：No.11 中性淡香精 —— 層次分明，是活力與知性的完美平衡。" },
+        "bd": { t: "【清爽奔放】果香 × 水生", d: "「明亮通透的生命力，如海洋與果實交織出的純粹。」", r: "推薦：The Balance (似白茶) —— 溫暖果香與純淨茶香，詮釋清爽自在。" },
+        "be": { t: "【純真歡愉】果香 × 甜香", d: "「熱情洋溢的幸福感，你走到哪裡，陽光就到哪裡。」", r: "推薦：Jealous 加上 溫柔炸彈，讓空氣滿溢著純真歡愉。" },
+        "cd": { t: "【冷靜遼闊】木質 × 水生", d: "「內斂中見廣闊，如海邊古木，靜謐中自有風度。」", r: "推薦：北方雪松 —— 廣闊清冷的木質基調，展現遼闊而不張揚的魅力。" },
+        "ce": { t: "【醇厚溫暖】木質 × 甜香", d: "「外在沉靜內在柔軟，是寒冬裡最令人安心的依傍。」", r: "推薦：神秘之香 (似黑色誘惑) —— 溫暖且充滿活力，深邃誘人。" },
+        "de": { t: "【清冷體貼】水生 × 甜香", d: "「獨立疏離卻藏著善意，在極簡中活出最深的情感。」", r: "推薦：溫柔炸彈 —— 在乾淨的水感基調中帶入柔和甜意，細膩迷人。" },
+        // 三三
+        "abc": { t: "【知性暖陽】花香 × 果香 × 木質", d: "「優雅、活力與穩定的平衡。你明媚動人，卻又無比可靠。」", r: "推薦：No.11 中性淡香精 —— 全能型魅力首選，適合多維度的妳。" },
+        "abd": { t: "【靈動清晨】花香 × 果香 × 水生", d: "「感性、灑脫且充滿朝氣。你如水面落花，活得輕盈自在。」", r: "推薦：Green Vines (似青藤玫瑰) —— 晨間青草與玫瑰，清新靈動。" },
+        "abe": { t: "【蜜意盛宴】花香 × 果香 × 甜香", d: "「浪漫與快樂的總和。你滿溢著療癒感，是身邊人的幸福來源。」", r: "推薦：Jealous + 溫柔炸彈 (疊香) —— 極致浪漫與幸福的盛宴。" },
+        "acd": { t: "【空靈幽蘭】花香 × 木質 × 水生", d: "「細膩、清冷且知性。你在平靜中擁抱自由，美得優雅而疏離。」", r: "推薦：The Balance (白茶) 加上 奧索尼爾玫瑰，氣質脫俗。" },
+        "ace": { t: "【溫潤依傍】花香 × 木質 × 甜香", d: "「柔美、堅實與暖意的交織。你是最溫柔的依靠，包容一切。」", r: "推薦：檀香之道 + 神秘之香，展現最溫潤厚實的包裹感。" },
+        "ade": { t: "【神祕夢境】花香 × 水生 × 甜香", d: "「溫婉且不染塵埃。清透姿態下藏著細膩甜意，讓人心生嚮往。」", r: "推薦：龍舌蘭晚香玉 —— 馥郁且深邃，讓人沉溺的夢境香氣。" },
+        "bcd": { t: "【率性旅人】果香 × 木質 × 水生", d: "「獨立、直率且有底蘊。活力中帶點冷靜，活得真實而灑脫。」", r: "推薦：北方雪松 —— 簡單俐落，最適合真實灑脫的率性靈魂。" },
+        "bce": { t: "【熱力暖爐】果香 × 木質 × 甜香", d: "「熱情可靠且富有溫度。穩重的外表下，藏著最純粹的歡愉。」", r: "推薦：神秘之香 —— 香氣鮮明溫暖，充滿性感與可靠的熱力。" },
+        "bde": { t: "【純真浪花】果香 × 水生 × 甜香", d: "「輕盈、通透且充滿善意。如澄澈海水中的甜糖，單純而溫暖。」", r: "推薦：The Balance + 溫柔炸彈，輕盈通透且充滿善意。" },
+        "cde": { t: "【深邃守候】木質 × 水生 × 甜香", d: "「安靜、自由且體貼。極簡外表下藏著醇厚情感，外冷內熱。」", r: "推薦：檀香之道 —— 穩重內斂卻非常有溫度，深刻且深情。" }
+    };
+
+    function render() {
+        const q = questions[current];
+        document.getElementById('progress').innerText = `鑑定進度 ${current + 1} / 10`;
+        document.getElementById('q-text').innerText = q.q;
+        document.getElementById('prev-btn').style.display = (current > 0) ? 'flex' : 'none';
+        const container = document.getElementById('opt-container');
+        container.innerHTML = '';
+        ['a','b','c','d','e'].forEach(k => {
+            const btn = document.createElement('button');
+            btn.className = 'opt-btn';
+            btn.innerText = q[k];
+            btn.onclick = function() {
+                historyStack.push({ scores: JSON.parse(JSON.stringify(scores)), current: current });
+                scores[k]++;
+                current++;
+                if(current < questions.length) render(); else finish();
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    window.handlePrev = function() {
+        if (historyStack.length > 0) {
+            const lastState = historyStack.pop();
+            scores = lastState.scores;
+            current = lastState.current;
+            render();
+        }
+    };
+
+    function finish() {
+        document.getElementById('quiz').style.display = 'none';
+        document.getElementById('prev-btn').style.display = 'none';
+        document.getElementById('result').style.display = 'block';
+        
+        const winners = Object.keys(scores).filter(k => scores[k] === Math.max(...Object.values(scores))).sort();
+        const key = winners.join('');
+        let finalTitle = "", finalDesc = "", finalRecomm = "";
+
+        if (winners.length === 5) {
+            finalTitle = "【全香調靈魂：平衡之美】";
+            finalDesc = "你兼具花果的優雅明媚與木質的沉穩知性；在水生般的灑脫自由中，藏著甜香般的細膩溫柔。";
+            finalRecomm = "推薦：JasonHarperson 威士忌系列 —— 層次分明且豐富，最能配得上妳的全能平衡。";
+        } else if (comboData[key]) {
+            finalTitle = comboData[key].t;
+            finalDesc = comboData[key].d;
+            finalRecomm = comboData[key].r;
+        } else {
+            finalTitle = "複合型靈魂香氣";
+            finalDesc = "你擁有多重迷人的香氣特質，是難得一見的複合型靈魂！";
+            finalRecomm = "推薦前往「小草香鋪」旗艦店，尋找專屬於妳的疊香密碼。";
+        }
+
+        document.getElementById('top-type').innerText = finalTitle;
+        document.getElementById('desc').innerHTML = finalDesc;
+        document.getElementById('recomm-text').innerText = finalRecomm;
+
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'radar',
+            data: {
+                labels: ['花香', '果香', '木質', '水生', '甜香'],
+                datasets: [{
+                    data: [scores.a, scores.b, scores.c, scores.d, scores.e],
+                    backgroundColor: 'rgba(203, 182, 217, 0.4)',
+                    borderColor: '#cbb6d9',
+                    borderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { r: { min: 0, max: 6, ticks: { display: false }, grid: { color: 'rgba(0,0,0,0.05)' } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+    render();
+</script>
+</body>
+</html>
